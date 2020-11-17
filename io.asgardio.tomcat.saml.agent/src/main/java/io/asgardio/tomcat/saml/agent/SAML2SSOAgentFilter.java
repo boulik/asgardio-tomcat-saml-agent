@@ -137,12 +137,17 @@ public class SAML2SSOAgentFilter implements Filter {
                 return;
 
             } else if (resolver.isPassiveAuthnRequest()) {
-           		SSOAgentConfig ssoAgentConfigTemp = ssoAgentConfig.copyFrom( ssoAgentConfig );
-           		ssoAgentConfigTemp.getSAML2().setPassiveAuthn(true);
-           		samlSSOManager = new SAML2SSOManager(ssoAgentConfigTemp);
-                String redirectUrl = samlSSOManager.buildRedirectRequest(request, false);
-                response.sendRedirect(redirectUrl);
-                return;
+            	try {
+            		SSOAgentConfig ssoAgentConfigTemp = ssoAgentConfig.clone();
+            		ssoAgentConfigTemp.getSAML2().setPassiveAuthn(true);
+            		samlSSOManager = new SAML2SSOManager(ssoAgentConfigTemp);
+            		String redirectUrl = samlSSOManager.buildRedirectRequest(request, false);
+            		response.sendRedirect(redirectUrl);
+            		return;
+            	}catch(CloneNotSupportedException e ) {
+            		handleException(request, response, ssoAgentConfig, e);
+                    return;
+            	}
             }
             String indexPage = ssoAgentConfig.getIndexPage();
             if (request.getSession(false) != null &&
@@ -180,7 +185,7 @@ public class SAML2SSOAgentFilter implements Filter {
     }
 
     protected void handleException(HttpServletRequest request, HttpServletResponse response,
-                                   SSOAgentConfig ssoAgentConfig, SSOAgentException e)
+                                   SSOAgentConfig ssoAgentConfig, Exception e)
             throws IOException, ServletException {
 
         String errorPage = ssoAgentConfig.getErrorPage();
@@ -188,8 +193,9 @@ public class SAML2SSOAgentFilter implements Filter {
             request.getSession(false).removeAttribute(SSOAgentConstants.SESSION_BEAN_NAME);
         }
         LOGGER.log(Level.SEVERE, e.getMessage());
-        request.setAttribute(SSOAgentConstants.SSO_AGENT_EXCEPTION, e);
+        request.setAttribute(SSOAgentConstants.SSO_AGENT_EXCEPTION, e instanceof SSOAgentException ? e : new SSOAgentException(e));
         RequestDispatcher requestDispatcher = request.getServletContext().getRequestDispatcher(errorPage);
         requestDispatcher.forward(request, response);
     }
+
 }
